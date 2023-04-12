@@ -1,5 +1,5 @@
 import { OPENAI_KEY } from "$env/static/private";
-import type { ChatCompletionRequestMessage, CreateChatCompletionRequest } from "openai";
+import type { ChatCompletionRequestMessage, CreateChatCompletionRequest, ChatCompletionRequestMessageRoleEnum  } from "openai";
 import type { RequestHandler } from "./$types";
 import { getTokens } from "$lib/tokenizer";
 import { json } from "@sveltejs/kit";
@@ -52,7 +52,7 @@ export const POST: RequestHandler = async ({ request }) => {
             throw new Error("Message flagged by OpenAI");
         }
 
-        const prompt = "You are a chat bot for a Danish company called Andels Net. Your name is Andelsbot.";
+        const prompt = "You are a chat bot for a Danish company called Andels Net. Your name is Andelsbot. You wont answerquestions about anything else than Andels Net. Please use the information from the provided sections to answer the user's questions.";
         tokenCount += getTokens(prompt);
 
         // Lav så den automatisk sletter de ældste beskeder hvis der er for mange tokens
@@ -60,16 +60,33 @@ export const POST: RequestHandler = async ({ request }) => {
             throw new Error("Too many tokens");
         }
 
-        const messages: ChatCompletionRequestMessage[] = [
-            {role: 'system', content: prompt},
-            ...reqMessages
-        ]
+        //Knowledge database
+        const knowledgeDatabase = [
+            "Section 1: Andels Net har lokaler på Østerbro i København",
+            "Section 2: internet koster 299 kr om måneden for voksne",
+            "Section 3: internet koster 199 kr om måneden for unge",
+            "Section 4: internet koster 199 kr om måneden for ældre over 68 år",
+            "Section 5: Det kan jeg desværre ikke svare på",
+            "Section 6: Jeg kan ikke hjælpe med andet end Andels Net",
+          ];
+          
+          const databaseMessages = knowledgeDatabase.map((section) => ({ role: "assistant" as ChatCompletionRequestMessageRoleEnum, content: section }));
+          const messages: ChatCompletionRequestMessage[] = [
+            { role: "system", content: prompt },
+            ...databaseMessages,
+            ...reqMessages,
+          ];
+
+        // const messages: ChatCompletionRequestMessage[] = [
+        //     {role: 'system', content: prompt},
+        //     ...reqMessages
+        // ]
 
         const ChatRequestOpts:CreateChatCompletionRequest = {
             model: 'gpt-3.5-turbo',
             messages,
-            temperature: 0.9,
-            stream: true
+            temperature: 0.5,
+            stream: true,
         }
 
         const chatResponse = await fetch('https://api.openai.com/v1/chat/completions', {
